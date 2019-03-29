@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "sfdcAccount"
+        }
+    },
+    "id": "712e2340-c629-47e2-9811-5fc1389dcfd0",
+    "version": "5.2.0.0"
+}

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:jbossts="http://www.mulesoft.org/schema/mule/jbossts" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/jbossts http://www.mulesoft.org/schema/mule/jbossts/current/mule-jbossts.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <sfdc:config name="Salesforce__Basic_Authentication" username="sfmule214@gmail.com" password="Sriram#1" securityToken="45pDsdQZTyWgGE1O2MJUjGwyP" doc:name="Salesforce: Basic Authentication" url="https://login.salesforce.com/services/Soap/u/41"/>
+    <flow name="post_accounts_flow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/sfdcaccounts" allowedMethods="POST" doc:name="HTTP /Accounts"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="53380454-fee9-44dc-ad9b-2323dc910d78">
+            <dw:input-payload doc:sample="sample_data\string.dwl" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	Name: payload.Account.Name,
+	Type: payload.Account.Type,
+	BillingStreet: payload.Account.BillingStreet,
+	BillingCity: payload.Account.BillingCity,
+	BillingState: payload.Account.BillingState,
+	BillingPostalCode: payload.Account.BillingPostalCode,
+	BillingCountry: payload.Account.BillingCountry,
+	AccountNumber: payload.Account.AccountNumber,
+	Industry: payload.Account.Industry,
+	AccountSource: payload.Account.AccountSource
+}]]]></dw:set-payload>
+        </dw:transform-message>
+        <sfdc:create config-ref="Salesforce__Basic_Authentication" type="Account" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+        <logger message="#[message]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+  {
+	"success": payload.success[0]	 
+	}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger level="INFO" doc:name="Logger" message="#[payload]"/>
+    </flow>
+    <flow name="get_accounts_flow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/sfdcaccounts/{ID}" allowedMethods="GET" doc:name="HTTP"/>
+        <set-variable variableName="AccountNumber" value="#[message.inboundProperties.'http.uri.params'.ID]" doc:name="Variable"/>
+
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT AccountNumber,Active__c,Name,Type FROM Account where AccountNumber='#[flowVars.AccountNumber]'" doc:name="Salesforce  Query"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="712e2340-c629-47e2-9811-5fc1389dcfd0">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	
+	"Account": 
+		{
+			Name: payload[0].Name,
+			Type: payload[0].Type,
+			AccountNumber: payload[0].AccountNumber
+		}		
+	
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger level="INFO" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-payload value="#[message.exception.toString()]" doc:name="Set Payload"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>
